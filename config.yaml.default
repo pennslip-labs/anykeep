@@ -1,0 +1,14 @@
+# ~/.config/anykeep/config.yaml
+
+anytype:
+  host: 127.0.0.1               # Default Anytype Local API host
+  port: 3100                      # Default Anytype Local API port
+  target_space_id: SPACE_ID     # The specific Anytype space to push notes into
+
+ingestion:
+  watch_directory: ~/Downloads  # Folder for 'anykeep watch' to monitor
+  auto_delete_zip: true           # If true, deletes the Takeout .zip after successful sync
+
+storage:
+  db_path: ~/.config/anykeep/state.db # Where the SQLite state tracking lives
+  log_level: INFO               # CLI verbosity (INFO, DEBUG, ERROR)
