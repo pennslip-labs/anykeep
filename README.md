@@ -1,41 +1,94 @@
 # anykeep
 
-A local-first, privacy-focused syncing utility designed to bridge Google Keep and Anytype via Google Takeout exports.
+A local-first, privacy-focused syncing utility for importing Google Keep notes from Google Takeout exports into Anytype.
 
 ## Overview
 
-`anykeep` provides a reliable, self-hosted pipeline to migrate and mirror your notes, checklists, and media attachments directly into your local Anytype vault without relying on brittle cloud APIs or complex OAuth setups.
+`anykeep` is intentionally offline-first. It reads exported Keep data from Google Takeout ZIP files or extracted Keep folders on disk and converts those notes into Anytype-ready structures.
+
+This project does not use live Google API calls, OAuth, or browser-based account authorization. All input is expected to come from an exported ZIP or extracted Takeout folder already downloaded to the machine.
+
+## What this project expects
+
+Incoming data should be a Google Takeout export containing Keep data. The parser works from local files only.
+
+## Supported input
+
+- A Google Takeout ZIP file
+- An extracted Takeout directory containing Keep JSON files
+- A `Takeout/Keep/`-style folder layout
 
 ## Key Features & Capabilities
 
-* **Manual & Automated Ingestion**: Run one-off imports via command-line arguments or let a background directory watcher automatically process newly downloaded Takeout ZIP archives.
-* **Zero-Cloud Security**: Eliminates OAuth apps, client secrets, and master tokens. Your Anytype Local API key is stored securely in your operating system's native credential vault using `keyring`.
-* **Idempotent State Tracking**: Utilizes a local SQLite database (`state.db`) and SHA256 file hashing to track sync states and prevent duplicate note imports.
-* **Comprehensive Extraction**: Gracefully parses nested note structures, including body text, checklist states, user labels, and embedded media attachments (images, audio, drawings).
+* **Local-only ingestion**: Reads exported Keep files from disk instead of contacting Google services.
+* **Privacy-first workflow**: No OAuth client secrets, refresh tokens, or Google auth flows.
+* **Manual and automated ingest**: Accepts either a ZIP path or a local extracted folder, and can later be extended to watch a download directory.
+* **Idempotent state tracking**: Keeps a local database and hash-based checks to avoid duplicate imports.
+* **Note parsing**: Extracts note text, labels, metadata, and archive/trash state from Takeout JSON.
 
-## Project Structure
+## Example usage
+
+Pass a sample Takeout ZIP directly:
+
+```bash
+python - <<'PY'
+from src.keep_parser import KeepParser
+
+parser = KeepParser()
+notes = parser.list_notes('tests/sample/takeout-20260901T183337Z-1-001.zip')
+print(notes[:3])
+PY
+```
+
+You can also point the parser at an extracted Keep directory instead of a ZIP:
+
+```bash
+python - <<'PY'
+from src.keep_parser import KeepParser
+
+parser = KeepParser()
+notes = parser.list_notes('/path/to/Takeout')
+print(notes[:3])
+PY
+```
+
+You can also set a path through the environment variable `GOOGLE_TAKEOUT_PATH`:
+
+```bash
+export GOOGLE_TAKEOUT_PATH="/path/to/Takeout"
+python - <<'PY'
+from src.keep_parser import KeepParser
+
+parser = KeepParser()
+notes = parser.list_notes()
+print(notes[:3])
+PY
+```
+
+## Project structure
 
 ```text
 anykeep/
-├── config.yaml.example       # Sample configuration file
-├── requirements.txt          # Python dependencies
-├── state.db                  # Local SQLite database (auto-generated)
+├── requirements.txt
+├── README.md
 ├── src/
 │   ├── __init__.py
-│   ├── cli.py                # Command-line interface entry point (Click)
-│   ├── config.py             # YAML loader & OS Keyring integration
-│   ├── db.py                 # SQLite database manager for tracking sync_map and hashes
-│   ├── takeout_watcher.py    # Directory observer (watchdog) for ZIP automation
-│   ├── keep_parser.py        # Parses raw Takeout JSON, HTML, and media refs
-│   ├── transformer.py        # Converts Keep JSON objects into Anytype payloads
-│   └── anytype_client.py     # Communicates with Anytype's Desktop Local REST API
+│   ├── cli.py
+│   ├── config.py
+│   ├── db.py
+│   ├── keep_parser.py
+│   ├── takeout_watcher.py
+│   ├── transformer.py
+│   └── anytype_client.py
 ├── tests/
-│   ├── test_parser.py
-│   └── test_transformer.py
-└── README.md
+│   ├── sample/
+│   └── test_cli_config.py
+├── state.db
+└── .venv/
 ```
 
-# Default Configuration Setup
+## Default configuration setup
+
 ```yaml
 anytype:
   host: "127.0.0.1"
@@ -51,8 +104,21 @@ storage:
   log_level: "INFO"
 ```
 
-# CLI Commands to be Implemented
-- anykeep auth --set-key: Securely saves your Anytype Local API key to the OS keyring.  
-- anykeep pull --source <path>: Manually ingests an extracted Keep folder or Takeout ZIP archive.  
-- anykeep watch: Monitors your download directory in the background for new Takeout archives.  
-- anykeep status: Displays a summary table of synced notes, unpushed items, and media counts.  
+## CLI commands to be implemented
+
+- `anykeep auth --set-key`: securely saves your Anytype Local API key to the OS keyring.
+- `anykeep pull --source <path>`: manually ingests an extracted Keep folder or Takeout ZIP archive.
+- `anykeep watch`: monitors a download directory for new Takeout archives.
+- `anykeep status`: displays a summary of synced notes and media counts.
+
+## Current import contract
+
+The parser intentionally treats Google Takeout as a local file input format. The import path is:
+
+- download Takeout ZIP locally
+- point the parser at that ZIP or extracted folder
+- read Keep JSON files from disk
+- convert them into note dictionaries or dataclass objects for downstream sync work
+
+There is no Google API client or OAuth lifecycle in this project at this stage.
+

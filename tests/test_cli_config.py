@@ -1,10 +1,13 @@
+import json
 import os
+import zipfile
 from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
 from src.cli import main
 from src.config import load_config, DEFAULT_CONFIG, get_config_path
+from src.keep_parser import KeepParser
 
 def test_cli_help():
     """Test that the main CLI entry point outputs help info correctly."""
@@ -33,3 +36,31 @@ def test_load_config_defaults(monkeypatch, tmp_path):
     assert config == DEFAULT_CONFIG
     assert config["anytype"]["host"] == "127.0.0.1"
     assert config["anytype"]["port"] == 3100
+
+
+def test_parser_reads_takeout_zip(tmp_path):
+    """Takeout ZIPs should be parsed locally without making any Google OAuth calls."""
+    keep_dir = tmp_path / "Takeout" / "Keep"
+    keep_dir.mkdir(parents=True)
+
+    payload = {
+        "title": "Test note",
+        "textContent": "hello from takeout",
+        "labels": [{"name": "work"}],
+        "color": "blue",
+        "isTrashed": False,
+        "isArchived": False,
+    }
+    note_path = keep_dir / "note_1.json"
+    note_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    zip_path = tmp_path / "takeout.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.write(note_path, arcname="Takeout/Keep/note_1.json")
+
+    parser = KeepParser()
+    notes = parser.list_notes(zip_path)
+
+    assert len(notes) == 1
+    assert notes[0]["title"] == "Test note"
+    assert notes[0]["body"] == "hello from takeout"
