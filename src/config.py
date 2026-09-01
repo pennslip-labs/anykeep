@@ -10,9 +10,13 @@ import os
 from pathlib import Path
 import yaml
 
+# The OS keyring is the secure storage layer for the Anytype Local API key.
+# All secrets are stored under a single app/service namespace and username.
 SERVICE_NAME = "anykeep"
 USERNAME = "anytype_local_api_key"
 
+# Default application configuration used when no user config file exists yet.
+# This keeps the CLI usable before a real config is created on disk.
 DEFAULT_CONFIG = {
     "anytype": {
         "host": "127.0.0.1",
@@ -29,26 +33,53 @@ DEFAULT_CONFIG = {
     }
 }
 
-def set_api_key():
-    """Prompts securely for the Anytype API key and saves it to the OS keyring."""
-    api_key = getpass.getpass("Enter your Anytype Local API Key: ")
-    
-    if not api_key: # if no given key
+# The keyring backend is resolved first so we fail early when the host OS has no
+# compatible secure storage provider available (e.g. missing SecretService/Keychain).
+def get_keyring_backend_name() -> str:
+    """Return the active OS keyring backend name for diagnostics and guard rails."""
+    try:
+        backend = keyring.get_keyring()
+        return type(backend).__name__
+    except Exception as exc:
+        raise RuntimeError(f"No usable OS keyring backend is available: {exc}") from exc
+
+
+# set_api_key() is the write path: user input is validated, then persisted to the
+# platform secure store keyed by the app/service name and username.
+def set_api_key(api_key: str = None):
+    """Securely stores the Anytype Local API key in the OS keyring."""
+    if not api_key:
+        api_key = getpass.getpass("Enter your Anytype Local API Key: ")
+
+    if not api_key:
         raise ValueError("API key cannot be empty...")
 
-    # if key is given (no validity check)
-    keyring.set_password(SERVICE_NAME, USERNAME, api_key)
-    print("API key successfully saved to OS keyring")
+    try:
+        get_keyring_backend_name()
+        keyring.set_password(SERVICE_NAME, USERNAME, api_key)
+        print("API key successfully saved to OS keyring")
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        raise RuntimeError(f"Failed to access OS keyring backend: {exc}") from exc
 
-def get_api_key():
-    """Retrieves the Anytype API key from the OS keyring"""
-    api_key = keyring.get_password(SERVICE_NAME, USERNAME)
 
-    # if there is no key found
+# get_api_key() is the read path used by the app when it needs the Anytype Local API
+# key for network calls. It verifies the backend exists and raises friendly errors if
+# the key has not been stored yet or the system keyring is unavailable.
+def get_api_key() -> str:
+    """Retrieves the Anytype API key from the OS keyring with robust error handling."""
+    try:
+        get_keyring_backend_name()
+        api_key = keyring.get_password(SERVICE_NAME, USERNAME)
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        raise RuntimeError(f"Failed to retrieve API key from OS keyring: {exc}") from exc
+
     if not api_key:
         raise RuntimeError("No API key found in the OS keyring. Run 'anykeep auth --set-key' first")
 
-    # if key was found
     return api_key
 
 def get_config_path() -> Path:
