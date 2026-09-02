@@ -27,6 +27,20 @@ def test_auth_no_flag():
     assert result.exit_code == 0
     assert "Use --set-key to store your API key." in result.output
 
+
+def test_auth_set_key_prompts_and_saves_key(monkeypatch):
+    """The CLI should pass hidden prompt input to the keyring write path."""
+    saved_keys = []
+    monkeypatch.setattr("src.cli.set_api_key", saved_keys.append)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ['auth', '--set-key'], input="test-api-key\n")
+
+    assert result.exit_code == 0
+    assert saved_keys == ["test-api-key"]
+    assert "SUCCESS: Anytype API key securely saved to OS keyring." in result.output
+    assert "test-api-key" not in result.output
+
 def test_load_config_defaults(monkeypatch, tmp_path):
     """Test loading configuration falls back to DEFAULT_CONFIG when config file is missing."""
     # Point home or config path to a temp directory by mocking Path.home()

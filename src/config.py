@@ -57,7 +57,6 @@ def set_api_key(api_key: str = None):
     try:
         get_keyring_backend_name()
         keyring.set_password(SERVICE_NAME, USERNAME, api_key)
-        print("API key successfully saved to OS keyring")
     except RuntimeError:
         raise
     except Exception as exc:
@@ -84,7 +83,7 @@ def get_api_key() -> str:
 
 def get_config_path() -> Path:
     """Returns to the users config file, creating directories if need be"""
-    config_dir = Path.home() / "config" / "anykeep"
+    config_dir = Path.home() / ".config" / "anykeep"
     config_dir.mkdir(parents=True, exist_ok=True)
 
     return config_dir / "config.yaml"

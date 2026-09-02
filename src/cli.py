@@ -40,8 +40,11 @@ def auth(set_key):
     """Authenticate and store your Anytype Local API key securely."""
     if set_key:
         try:
-            # Step: Securely prompt for and store the API key in the OS keyring
-            set_api_key()
+            api_key = click.prompt(
+                "Enter your Anytype Local API key",
+                hide_input=True,
+            )
+            set_api_key(api_key)
             click.echo("SUCCESS: Anytype API key securely saved to OS keyring.")
         except Exception as e:
             click.echo(f"ERROR: Failed to save API key to keyring: {e}", err=True)

@@ -6,6 +6,18 @@ A local-first, privacy-focused syncing utility for importing Google Keep notes f
 
 `anykeep` is intentionally offline-first. It reads exported Keep data from Google Takeout ZIP files or extracted Keep folders on disk and converts those notes into Anytype-ready structures.
 
+Install the CLI from the repository root:
+
+```bash
+python -m pip install -e .
+```
+
+After installation, configure the Anytype Local API key with:
+
+```bash
+anykeep auth --set-key
+```
+
 This project does not use live Google API calls, OAuth, or browser-based account authorization. All input is expected to come from an exported ZIP or extracted Takeout folder already downloaded to the machine.
 
 ## Current project status
@@ -152,5 +164,4 @@ The parser intentionally treats Google Takeout as a local file input format. The
 - read Keep JSON files from disk
 - convert them into note dictionaries or dataclass objects for downstream sync work
 
-There is no Google API client or OAuth lifecycle in this project at this stage.
-
+There is no Google API client or OAuth lifecycle in this project at this stage. 
