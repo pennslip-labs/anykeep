@@ -8,14 +8,13 @@ import sys
 from pathlib import Path
 import keyring
 import click
+import hashlib
+import json
 
-# stub libraries as when internal modules get built over time
-from .config import load_config, set_api_key, get_config_path, DEFAULT_CONFIG
-# from .db import DatabaseManager
-# from .keep_parser import parse_takeout
-# from .transformer import transform_note
-# from .anytype_client import AnytypeClient
-# from .takeout_watcher import start_watcher
+from .config import load_config, set_api_key
+from .db import DatabaseManager
+from .keep_parser import KeepParser
+from .takeout_watcher import start_watcher
 
 KEYRING_SERVICE_NAME = "anykeep"
 KEYRING_USERNAME = "anytype_local_api_key"
@@ -69,11 +68,38 @@ def pull(ctx, source):
 @click.pass_context
 def watch(ctx):
     """Start background directory watcher for automatic Takeout syncing."""
-    click.echo("Starting Anykeep background directory watcher...")
-    # 1. Read watch_directory from configuration
-    # 2. Instantiate and run takeout_watcher.py observer daemon
-    
-	# TODO: implement watch
+    config = ctx.obj['CONFIG']
+    ingestion_config = config.get('ingestion', {})
+    watch_directory = Path(ingestion_config.get('watch_directory', '~/Downloads')).expanduser()
+    auto_delete_zip = bool(ingestion_config.get('auto_delete_zip', True))
+
+    click.echo(f"Watching for Takeout archives in: {watch_directory}")
+    try:
+        start_watcher(
+            watch_directory,
+            lambda archive: _process_takeout_archive(archive, config),
+            auto_delete_zip=auto_delete_zip,
+        )
+    except OSError as error:
+        raise click.ClickException(str(error)) from error
+
+
+def _process_takeout_archive(archive: Path, config: dict) -> None:
+    """Parse a watched archive and persist its current state for later sync."""
+    parser = KeepParser()
+    notes = parser.list_notes(archive)
+    db_path = config.get('storage', {}).get('db_path')
+
+    with DatabaseManager(db_path) as database:
+        for note in notes:
+            note_id = str(note.get('id') or note.get('title') or archive.name)
+            file_hash = hashlib.sha256(
+                json.dumps(note, sort_keys=True, separators=(',', ':')).encode('utf-8')
+            ).hexdigest()
+            existing = database.get_sync_record(note_id)
+            if existing and existing['file_hash'] == file_hash:
+                continue
+            database.upsert_sync_record(note_id, file_hash, 'PARSED')
 
 @main.command()
 @click.pass_context
