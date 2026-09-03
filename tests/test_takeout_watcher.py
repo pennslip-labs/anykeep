@@ -36,6 +36,26 @@ def test_watcher_ignores_non_zip_and_retains_failed_archive(tmp_path):
     assert archive.exists()
 
 
+def test_watcher_retries_modified_archive_and_ignores_duplicate_events(tmp_path):
+    archive = tmp_path / "takeout.zip"
+    archive.write_bytes(b"partial")
+    processed = []
+
+    def process(path):
+        processed.append(path)
+        if len(processed) == 1:
+            raise ValueError("still writing")
+
+    watcher = TakeoutWatcher(process, auto_delete_zip=False, stability_interval=0)
+    watcher.on_created(SimpleNamespace(is_directory=False, src_path=str(archive)))
+    archive.write_bytes(b"complete archive")
+    watcher.on_modified(SimpleNamespace(is_directory=False, src_path=str(archive)))
+    watcher.on_modified(SimpleNamespace(is_directory=False, src_path=str(archive)))
+
+    assert processed == [archive, archive]
+
+
+
 class RecordingObserver:
     def __init__(self):
         self.scheduled = None

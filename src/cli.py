@@ -8,8 +8,6 @@ import sys
 from pathlib import Path
 import keyring
 import click
-import hashlib
-import json
 
 from .config import load_config, set_api_key
 from .db import DatabaseManager
@@ -92,10 +90,10 @@ def _process_takeout_archive(archive: Path, config: dict) -> None:
 
     with DatabaseManager(db_path) as database:
         for note in notes:
-            note_id = str(note.get('id') or note.get('title') or archive.name)
-            file_hash = hashlib.sha256(
-                json.dumps(note, sort_keys=True, separators=(',', ':')).encode('utf-8')
-            ).hexdigest()
+            note_id = str(note.get('id') or note.get('source_path') or archive.name)
+            file_hash = note.get('source_hash')
+            if not file_hash:
+                raise ValueError(f"Parser did not provide a source hash for note {note_id}")
             existing = database.get_sync_record(note_id)
             if existing and existing['file_hash'] == file_hash:
                 continue

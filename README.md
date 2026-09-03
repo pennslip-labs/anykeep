@@ -30,6 +30,21 @@ The project now includes:
 - CLI auth entry points for storing credentials
 - a pytest-based validation suite for config and parser behavior
 
+### Remaining implementation work
+
+The following areas are still incomplete and should be tracked as separate issues:
+
+- **Complete the manual pull pipeline:** implement `anykeep pull --source` from parsing through transformation, deduplication, Anytype upload, media upload, and database state updates.
+- **Build the transformer:** implement `src/transformer.py` to map Keep notes, rich text, checklists, labels, metadata, and attachments into Anytype object payloads.
+- **Build the Anytype client:** implement `src/anytype_client.py` for API-key authentication, object create/update requests, media uploads, HTTP errors, and retry handling.
+- **Finish watcher ingestion:** connect `anykeep watch` to the complete pull pipeline and delete archives only after every note and attachment has been processed successfully.
+- **Improve retry and error state handling:** persist `PENDING`, `PUSHED`, and `ERROR` states with useful error messages, and make failed notes retryable without reprocessing unchanged notes.
+- **Implement the status command:** query `sync_map` and display note totals, media totals, pending/error counts, and failed note details.
+- **Expand end-to-end tests:** cover successful and failed pulls, Anytype and media upload errors, retries, deduplication, archive cleanup, and status output using mocked API responses.
+- **Add deployment support:** provide systemd/launchd service examples and document running the watcher as a background service.
+
+The parser, source-content hashing, alternate Takeout layouts, attachment discovery, malformed-input reporting, and stable archive detection are implemented. The downstream transformation and Anytype synchronization stages remain local-only until the items above are completed.
+
 ## What this project expects
 
 Incoming data should be a Google Takeout export containing Keep data. The parser works from local files only.
